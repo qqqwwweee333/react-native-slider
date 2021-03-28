@@ -71,6 +71,7 @@ export default class Slider extends PureComponent {
      * Initial minimum value of the slider. Default value is 0.
      */
     minimumValue: PropTypes.number,
+    bufferValue: PropTypes.number,
 
     /**
      * Initial maximum value of the slider. Default value is 1.
@@ -173,6 +174,7 @@ export default class Slider extends PureComponent {
   static defaultProps = {
     value: 0,
     minimumValue: 0,
+    bufferValue: 0,
     maximumValue: 1,
     step: 0,
     minimumTrackTintColor: '#3f3f3f',
@@ -190,6 +192,7 @@ export default class Slider extends PureComponent {
     thumbSize: {width: 0, height: 0},
     allMeasured: false,
     value: new Animated.Value(this.props.value),
+    bufferValue: new Animated.Value(this.props.bufferValue),
   };
 
   componentWillMount() {
@@ -206,6 +209,12 @@ export default class Slider extends PureComponent {
 
   componentWillReceiveProps(nextProps) {
     var newValue = nextProps.value;
+    var newbufferValue = nextProps.bufferValue;
+
+    if(this.props.bufferValue !== newbufferValue){
+      this._setCurrentbufferValue(newbufferValue);
+    }
+
 
     if (this.props.value !== newValue) {
       if (this.props.animateTransitions) {
@@ -220,6 +229,7 @@ export default class Slider extends PureComponent {
   render() {
     var {
       minimumValue,
+      bufferValue,
       maximumValue,
       minimumTrackTintColor,
       bufferTrackTintColor,
@@ -233,11 +243,16 @@ export default class Slider extends PureComponent {
       debugTouchArea,
       ...other
     } = this.props;
-    var {value, containerSize, trackSize, thumbSize, allMeasured} = this.state;
+    var {value, containerSize, trackSize, thumbSize, allMeasured,bufferValue} = this.state;
     var mainStyles = styles || defaultStyles;
     var thumbLeft = value.interpolate({
       inputRange: [minimumValue, maximumValue],
       outputRange: [0, containerSize.width - thumbSize.width],
+      //extrapolate: 'clamp',
+    });
+    var thumbBuffer = bufferValue.interpolate({
+      inputRange: [minimumValue, maximumValue],
+      outputRange: [0, containerSize.width],
       //extrapolate: 'clamp',
     });
     var valueVisibleStyle = {};
@@ -247,9 +262,8 @@ export default class Slider extends PureComponent {
 
     var bufferTrackStyle = {
       position: 'absolute',
-      width: Animated.add(thumbLeft, thumbSize.width / 2),
+      width: Animated.add(thumbBuffer, thumbSize.width / 2),
       backgroundColor: bufferTrackTintColor,
-      ...valueVisibleStyle
     };
 
     var minimumTrackStyle = {
@@ -263,41 +277,41 @@ export default class Slider extends PureComponent {
 
     return (
         <View {...other} style={[mainStyles.container, style]} onLayout={this._measureContainer}>
-        <View
-    style={[{backgroundColor: maximumTrackTintColor,}, mainStyles.track, trackStyle]}
-    renderToHardwareTextureAndroid={true}
-    onLayout={this._measureTrack} />
-    <Animated.View
-    renderToHardwareTextureAndroid={true}
-    style={[mainStyles.track, trackStyle, bufferTrackStyle]} />
-    <Animated.View
-    renderToHardwareTextureAndroid={true}
-    style={[mainStyles.track, trackStyle, minimumTrackStyle]} />
-    <Animated.View
-    onLayout={this._measureThumb}
-    renderToHardwareTextureAndroid={true}
-    style={[
-          {backgroundColor: thumbTintColor},
-      mainStyles.thumb, thumbStyle,
-    {
-      transform: [
-        { translateX: thumbLeft },
-        { translateY: 0 }
-      ],
-    ...valueVisibleStyle
-    }
-  ]}
-  >
-    {this._renderThumbImage()}
-  </Animated.View>
-    <View
-    renderToHardwareTextureAndroid={true}
-    style={[defaultStyles.touchArea, touchOverflowStyle]}
-    {...this._panResponder.panHandlers}>
-    {debugTouchArea === true && this._renderDebugThumbTouchRect(thumbLeft)}
-  </View>
-    </View>
-  );
+          <View
+              style={[{backgroundColor: maximumTrackTintColor,}, mainStyles.track, trackStyle]}
+              renderToHardwareTextureAndroid={true}
+              onLayout={this._measureTrack} />
+          <Animated.View
+              renderToHardwareTextureAndroid={true}
+              style={[mainStyles.track, trackStyle, bufferTrackStyle]} />
+          <Animated.View
+              renderToHardwareTextureAndroid={true}
+              style={[mainStyles.track, trackStyle, minimumTrackStyle]} />
+          <Animated.View
+              onLayout={this._measureThumb}
+              renderToHardwareTextureAndroid={true}
+              style={[
+                {backgroundColor: thumbTintColor},
+                mainStyles.thumb, thumbStyle,
+                {
+                  transform: [
+                    { translateX: thumbLeft },
+                    { translateY: 0 }
+                  ],
+                  ...valueVisibleStyle
+                }
+              ]}
+          >
+            {this._renderThumbImage()}
+          </Animated.View>
+          <View
+              renderToHardwareTextureAndroid={true}
+              style={[defaultStyles.touchArea, touchOverflowStyle]}
+              {...this._panResponder.panHandlers}>
+            {debugTouchArea === true && this._renderDebugThumbTouchRect(thumbLeft)}
+          </View>
+        </View>
+    );
   };
 
   _getPropsForComponentUpdate(props) {
@@ -358,7 +372,7 @@ export default class Slider extends PureComponent {
   };
 
   _measureTrack = (x: Object) => {
-    this._handleMeasure('trackSize', x);
+    this._handleMeasure('trackSize', x);//_trackSize
   };
 
   _measureThumb = (x: Object) => {
@@ -419,11 +433,14 @@ export default class Slider extends PureComponent {
   _getCurrentValue = () => {
     return this.state.value.__getValue();
   };
+//_setCurrentbufferValue
 
+  _setCurrentbufferValue = (value: number) => {
+    this.state.bufferValue.setValue(value);
+  };
   _setCurrentValue = (value: number) => {
     this.state.value.setValue(value);
   };
-
   _setCurrentValueAnimated = (value: number) => {
     var animationType   = this.props.animationType;
     var animationConfig = Object.assign(
@@ -507,10 +524,10 @@ export default class Slider extends PureComponent {
 
     return (
         <Animated.View
-    style={[defaultStyles.debugThumbTouchArea, positionStyle]}
-    pointerEvents='none'
+            style={[defaultStyles.debugThumbTouchArea, positionStyle]}
+            pointerEvents='none'
         />
-  );
+    );
   };
 
   _renderThumbImage = () => {
